@@ -23,7 +23,7 @@ def send_welcome(message):
     
     # Web App Button (Yahan aapko baad me apna live URL dalna hoga)
     markup = InlineKeyboardMarkup()
-    web_app_url = "https://obviously-very-cooler-lan.trycloudflare.com"
+    web_app_url = "https://ff-recovery-bot.onrender.com"
  # Tunnel URL yahan aayega
     markup.add(InlineKeyboardButton("🚀 Open Recovery Web App", web_app=WebAppInfo(url=web_app_url)))
     
