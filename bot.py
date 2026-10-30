@@ -15,23 +15,24 @@ app = Flask(__name__)
 user_states = {}
 
 def generate_ticket_id():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
-# Webhook route taaki Telegram ki requests 404 na dein
+# Webhook route (Flask ka built-in request.json use kiya hai taaki request miss na ho)
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
+        json_data = request.json
+        if json_data:
+            update = telebot.types.Update.de_json(json_data)
+            bot.process_new_updates([update])
         return '', 200
     else:
         return 'Forbidden', 403
 
-# Basic home route taaki browser par kholne par 404 na aaye
+# Basic home route
 @app.route('/')
 def index():
-    return "FF Recovery Bot is live and running 24/7!"
+    return "FF Recovery Bot is live and running successfully!"
 
 # /start command handler
 @bot.message_handler(commands=['start'])
@@ -87,14 +88,13 @@ def handle_recovery_steps(message):
             parse_mode="Markdown"
         )
 
-        # Admin ke liye approval buttons wala message
+        # Admin ke liye approval buttons wala message (Yahi chat ya admin chat par jayega)
         markup = InlineKeyboardMarkup()
         markup.row(
             InlineKeyboardButton("✅ Approve", callback_data=f"approve_{ticket_id}_{chat_id}"),
             InlineKeyboardButton("❌ Reject", callback_data=f"reject_{ticket_id}_{chat_id}")
         )
         
-        # Yahan request admin/channel ya current chat par notify hogi
         bot.send_message(
             chat_id, 
             f"🚨 **New Recovery Request!**\n\n🎟️ **Ticket:** `{ticket_id}`\n👤 **User:** @{username} (`{chat_id}`)\n🆔 **UID:** `{uid}`\n🏷️ **IGN:** `{ign}`\n💳 **Payment:** {payment_info}", 
