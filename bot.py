@@ -25,7 +25,6 @@ def check_session_timeout(chat_id):
             return True
     return False
 
-# Safe wrapper for callback queries to prevent expired query crashes on retry
 def safe_answer(call_id):
     try:
         bot.answer_callback_query(call_id)
@@ -67,11 +66,17 @@ def start_command(message):
     except Exception:
         bot.send_message(chat_id, caption, parse_mode="Markdown", reply_markup=markup)
 
-# 2. T&C Agree -> Service Needed Selection
+# 2. T&C Agree -> Delete Banner Photo & Send Fresh Text Message for Service Selection
 @bot.callback_query_handler(func=lambda call: call.data == "agree_tc")
 def agree_tc_callback(call):
     safe_answer(call.id)
     chat_id = call.message.chat.id
+    
+    # Delete the old photo banner message cleanly
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except Exception:
+        pass
     
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -79,10 +84,9 @@ def agree_tc_callback(call):
         InlineKeyboardButton("⭐ Premium Recovery", callback_data="plan_premium")
     )
     
-    bot.edit_message_caption(
+    bot.send_message(
         chat_id=chat_id,
-        message_id=call.message.message_id,
-        caption="🛠️ **What kind of service needed?**\n\nSelect your preferred recovery tier below:",
+        text="🛠️ **What kind of service needed?**\n\nSelect your preferred recovery tier below:",
         parse_mode="Markdown",
         reply_markup=markup
     )
