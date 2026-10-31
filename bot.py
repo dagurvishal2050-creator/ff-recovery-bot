@@ -25,6 +25,13 @@ def check_session_timeout(chat_id):
             return True
     return False
 
+# Safe wrapper for callback queries to prevent expired query crashes on retry
+def safe_answer(call_id):
+    try:
+        bot.answer_callback_query(call_id)
+    except Exception:
+        pass
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -63,7 +70,7 @@ def start_command(message):
 # 2. T&C Agree -> Service Needed Selection
 @bot.callback_query_handler(func=lambda call: call.data == "agree_tc")
 def agree_tc_callback(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     chat_id = call.message.chat.id
     
     markup = InlineKeyboardMarkup()
@@ -83,7 +90,7 @@ def agree_tc_callback(call):
 # 3. Plan Selection & Duration Confirmation
 @bot.callback_query_handler(func=lambda call: call.data in ["plan_basic", "plan_premium"])
 def plan_selection_callback(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     chat_id = call.message.chat.id
     
     is_premium = (call.data == "plan_premium")
@@ -106,7 +113,7 @@ def plan_selection_callback(call):
 # 4. Sub-Options & Pricing Display
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_plan_"))
 def show_sub_options(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     chat_id = call.message.chat.id
     
     is_premium = "premium" in call.data
@@ -132,7 +139,7 @@ def show_sub_options(call):
 # 5. Handle Sub-Option selection
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sub_"))
 def handle_sub_selection(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     chat_id = call.message.chat.id
     
     parts = call.data.split("_")
@@ -192,7 +199,7 @@ def collect_user_details(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("login_"))
 def handle_login_method(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     chat_id = call.message.chat.id
     
     login_method = call.data.split("_")[1]
@@ -242,7 +249,7 @@ def handle_uid(message):
 # 7. Payment Screen
 @bot.callback_query_handler(func=lambda call: call.data == "proceed_payment")
 def proceed_to_payment(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     chat_id = call.message.chat.id
     
     price = user_states.get(chat_id, {}).get("price", "0")
@@ -317,7 +324,7 @@ def handle_gift_card(message):
 # 8. Admin Action Handler
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("pay_recv_", "pay_notrecv_")))
 def handle_admin_payment_action(call):
-    bot.answer_callback_query(call.id)
+    safe_answer(call.id)
     data_parts = call.data.split("_")
     action = data_parts[1]
     ticket_id = data_parts[2]
